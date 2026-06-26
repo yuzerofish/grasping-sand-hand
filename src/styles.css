@@ -252,7 +252,7 @@ body {
     width: 186vw;
     transform:
       translate(-54%, -50%)
-      scale(calc(0.9 + var(--progress) * 0.08 + var(--speed) * 0.025));
+      scale(calc(0.9 + var(--progress) * 0.08));
   }
 
   .release-orb {
