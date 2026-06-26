@@ -3,8 +3,14 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 const clamp = (value: number, min = 0, max = 1) => Math.min(max, Math.max(min, value));
 const frameCount = 137;
 const restingProgress = 0.52;
+const openProgress = 0.92;
+const closedProgress = 0.06;
 const assetBase = import.meta.env.BASE_URL;
 const framePath = (index: number) => `${assetBase}assets/release-cutout-frames/frame_${String(index).padStart(3, "0")}.webp`;
+const normalizeWheelDelta = (event: WheelEvent) => {
+  const unit = event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? window.innerHeight : event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1;
+  return Math.abs(event.deltaY) * unit;
+};
 
 const phases = [
   {
@@ -27,9 +33,12 @@ const phases = [
 export default function App() {
   const rafRef = useRef<number>(0);
   const progressRef = useRef(restingProgress);
-  const velocityRef = useRef(0);
+  const speedRef = useRef(0);
+  const inputImpulseRef = useRef(0);
   const lastScrollYRef = useRef(0);
   const lastFrameTimeRef = useRef(0);
+  const lastTouchYRef = useRef<number | null>(null);
+  const lastTouchTimeRef = useRef(0);
   const hasInteractedRef = useRef(false);
   const [progress, setProgress] = useState(restingProgress);
   const [scrollSpeed, setScrollSpeed] = useState(0);
@@ -46,18 +55,23 @@ export default function App() {
       const elapsed = Math.max(16, time - lastFrameTimeRef.current);
       const scrollY = window.scrollY;
       const delta = scrollY - lastScrollYRef.current;
-      const instantVelocity = Math.abs(delta) / elapsed;
+      const instantScrollSpeed = clamp(Math.abs(delta) / elapsed / 0.48);
 
       if (Math.abs(delta) > 0.6) {
         hasInteractedRef.current = true;
       }
 
-      const smoothedVelocity = velocityRef.current * 0.78 + instantVelocity * 0.22;
-      velocityRef.current = smoothedVelocity;
+      const impulseDecay = Math.pow(0.16, elapsed / 1000);
+      inputImpulseRef.current *= impulseDecay;
 
-      const speedTension = hasInteractedRef.current ? clamp((smoothedVelocity - 0.08) / 1.1) : 0;
-      const targetProgress = hasInteractedRef.current ? 0.9 - speedTension * 0.82 : restingProgress;
-      const easing = hasInteractedRef.current ? 0.046 + speedTension * 0.16 : 0.08;
+      const rawSpeed = hasInteractedRef.current ? Math.max(instantScrollSpeed, inputImpulseRef.current) : 0;
+      const speedEasing = rawSpeed > speedRef.current ? 0.64 : 0.16;
+      const nextSpeed = speedRef.current + (rawSpeed - speedRef.current) * speedEasing;
+      speedRef.current = clamp(nextSpeed);
+
+      const grip = Math.pow(speedRef.current, 0.72);
+      const targetProgress = hasInteractedRef.current ? openProgress - grip * (openProgress - closedProgress) : restingProgress;
+      const easing = speedRef.current > 0.18 ? 0.24 + grip * 0.34 : 0.095;
       const nextProgress = progressRef.current + (targetProgress - progressRef.current) * easing;
 
       progressRef.current = clamp(nextProgress);
@@ -65,23 +79,53 @@ export default function App() {
       lastFrameTimeRef.current = time;
 
       setProgress(progressRef.current);
-      setScrollSpeed(speedTension);
+      setScrollSpeed(speedRef.current);
       rafRef.current = window.requestAnimationFrame(syncMotion);
     };
 
-    const markInteraction = () => {
+    const pushImpulse = (strength: number) => {
       hasInteractedRef.current = true;
+      const impulse = clamp(strength);
+      inputImpulseRef.current = Math.max(inputImpulseRef.current, impulse);
+      progressRef.current = clamp(progressRef.current - impulse * 0.22);
+      setProgress(progressRef.current);
+    };
+
+    const handleWheel = (event: WheelEvent) => {
+      pushImpulse(normalizeWheelDelta(event) / 180);
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (!event.touches[0]) return;
+      lastTouchYRef.current = event.touches[0].clientY;
+      lastTouchTimeRef.current = performance.now();
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!event.touches[0] || lastTouchYRef.current === null) return;
+      const now = performance.now();
+      const elapsed = Math.max(16, now - lastTouchTimeRef.current);
+      const delta = Math.abs(event.touches[0].clientY - lastTouchYRef.current);
+      pushImpulse((delta / elapsed) / 0.42);
+      lastTouchYRef.current = event.touches[0].clientY;
+      lastTouchTimeRef.current = now;
+    };
+
+    const handleKeyDown = () => {
+      pushImpulse(0.62);
     };
 
     rafRef.current = window.requestAnimationFrame(syncMotion);
-    window.addEventListener("wheel", markInteraction, { passive: true });
-    window.addEventListener("touchmove", markInteraction, { passive: true });
-    window.addEventListener("keydown", markInteraction);
+    window.addEventListener("wheel", handleWheel, { passive: true });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      window.removeEventListener("wheel", markInteraction);
-      window.removeEventListener("touchmove", markInteraction);
-      window.removeEventListener("keydown", markInteraction);
+      window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("keydown", handleKeyDown);
       if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
     };
   }, []);
