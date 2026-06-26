@@ -31,7 +31,8 @@ body {
 }
 
 .release-page {
-  --progress: 0;
+  --progress: 0.52;
+  --speed: 0;
   --tension: 1;
   min-height: 100vh;
   color: #f5f1f8;
@@ -94,10 +95,10 @@ body {
     radial-gradient(ellipse at 48% 52%, rgb(4 5 10 / 0.72), rgb(21 18 32 / 0.42) 44%, transparent 72%),
     radial-gradient(ellipse at 50% 50%, rgb(0 0 0 / 0.45), transparent 68%);
   filter: blur(24px);
-  opacity: calc(0.86 - var(--progress) * 0.78);
+  opacity: calc(0.86 - var(--progress) * 0.78 + var(--speed) * 0.18);
   transform:
     translate(-50%, -50%)
-    scale(calc(0.74 + var(--progress) * 0.28));
+    scale(calc(0.74 + var(--progress) * 0.28 - var(--speed) * 0.08));
 }
 
 .release-orb {
@@ -110,10 +111,10 @@ body {
     radial-gradient(ellipse at 50% 50%, rgb(255 253 255 / calc(0.06 + var(--progress) * 0.74)) 0 24%, transparent 25%),
     radial-gradient(ellipse at 50% 52%, rgb(222 215 235 / calc(0.1 + var(--progress) * 0.38)) 0 48%, transparent 74%);
   filter: blur(calc(28px + var(--progress) * 32px));
-  opacity: calc(0.24 + var(--progress) * 0.78);
+  opacity: calc(0.24 + var(--progress) * 0.78 - var(--speed) * 0.16);
   transform:
     translate(-50%, -50%)
-    scale(calc(0.54 + var(--progress) * 0.72));
+    scale(calc(0.54 + var(--progress) * 0.72 - var(--speed) * 0.1));
 }
 
 .grain-field {
@@ -129,7 +130,7 @@ body {
     70px 70px,
     112px 112px;
   mask-image: radial-gradient(ellipse at 57% 50%, black 0 31%, transparent 75%);
-  transform: translateY(calc(var(--progress) * -1.8rem));
+  transform: translateY(calc(var(--progress) * -1.8rem + var(--speed) * 0.6rem));
 }
 
 .video-field {
@@ -140,10 +141,10 @@ body {
   aspect-ratio: 16 / 9;
   transform:
     translate(-50%, -50%)
-    scale(calc(0.9 + var(--progress) * 0.08));
+    scale(calc(0.9 + var(--progress) * 0.08 + var(--speed) * 0.025));
   filter:
-    saturate(calc(0.86 + var(--progress) * 0.16))
-    contrast(calc(1.03 - var(--progress) * 0.03));
+    saturate(calc(0.86 + var(--progress) * 0.16 - var(--speed) * 0.08))
+    contrast(calc(1.03 - var(--progress) * 0.03 + var(--speed) * 0.08));
 }
 
 .release-frame {
@@ -153,8 +154,8 @@ body {
   object-fit: contain;
   opacity: calc(0.9 + var(--progress) * 0.1);
   filter:
-    brightness(calc(0.72 + var(--progress) * 0.26))
-    drop-shadow(0 2.2rem 4.6rem rgb(5 5 10 / calc(0.28 - var(--progress) * 0.13)));
+    brightness(calc(0.72 + var(--progress) * 0.26 - var(--speed) * 0.08))
+    drop-shadow(0 2.2rem 4.6rem rgb(5 5 10 / calc(0.28 - var(--progress) * 0.13 + var(--speed) * 0.1)));
   -webkit-user-drag: none;
   user-select: none;
 }
@@ -164,7 +165,7 @@ body {
   inset: 0;
   background:
     radial-gradient(ellipse at 58% 50%, rgb(255 255 255 / calc(var(--progress) * 0.18)), transparent 40%),
-    linear-gradient(90deg, rgb(12 12 18 / calc(var(--tension) * 0.28)), transparent 42%);
+    linear-gradient(90deg, rgb(12 12 18 / calc(var(--tension) * 0.28 + var(--speed) * 0.2)), transparent 42%);
   mix-blend-mode: soft-light;
   pointer-events: none;
 }

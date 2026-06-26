@@ -2,65 +2,86 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 
 const clamp = (value: number, min = 0, max = 1) => Math.min(max, Math.max(min, value));
 const frameCount = 137;
+const restingProgress = 0.52;
 const assetBase = import.meta.env.BASE_URL;
 const framePath = (index: number) => `${assetBase}assets/release-cutout-frames/frame_${String(index).padStart(3, "0")}.webp`;
 
 const phases = [
   {
-    threshold: 0.3,
+    threshold: 0.34,
     eyebrow: "执",
-    line: "越用力，越握不住。",
+    line: "越急，越像握住一块影子。",
   },
   {
     threshold: 0.72,
-    eyebrow: "落",
-    line: "沙落下，不必挽留。",
+    eyebrow: "息",
+    line: "慢下来，掌心开始有风。",
   },
   {
     threshold: 1,
     eyebrow: "空",
-    line: "掌心空了，心也有了位置。",
+    line: "不再用力，沙自然离开。",
   },
 ];
 
 export default function App() {
-  const sceneRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
-  const [progress, setProgress] = useState(0);
-  const [frameIndex, setFrameIndex] = useState(0);
+  const progressRef = useRef(restingProgress);
+  const velocityRef = useRef(0);
+  const lastScrollYRef = useRef(0);
+  const lastFrameTimeRef = useRef(0);
+  const hasInteractedRef = useRef(false);
+  const [progress, setProgress] = useState(restingProgress);
+  const [scrollSpeed, setScrollSpeed] = useState(0);
 
   const phase = useMemo(() => phases.find((item) => progress <= item.threshold) ?? phases[2], [progress]);
+  const frameIndex = Math.round(progress * (frameCount - 1));
   const currentFrame = framePath(frameIndex);
 
   useEffect(() => {
-    const syncProgress = () => {
-      const scene = sceneRef.current;
-      if (!scene) return;
+    lastScrollYRef.current = window.scrollY;
+    lastFrameTimeRef.current = performance.now();
 
-      const rect = scene.getBoundingClientRect();
-      const travel = Math.max(1, rect.height - window.innerHeight);
-      const nextProgress = clamp(-rect.top / travel);
-      const nextFrame = Math.round(nextProgress * (frameCount - 1));
+    const syncMotion = (time: number) => {
+      const elapsed = Math.max(16, time - lastFrameTimeRef.current);
+      const scrollY = window.scrollY;
+      const delta = scrollY - lastScrollYRef.current;
+      const instantVelocity = Math.abs(delta) / elapsed;
 
-      setProgress(nextProgress);
-      setFrameIndex(nextFrame);
+      if (Math.abs(delta) > 0.6) {
+        hasInteractedRef.current = true;
+      }
+
+      const smoothedVelocity = velocityRef.current * 0.78 + instantVelocity * 0.22;
+      velocityRef.current = smoothedVelocity;
+
+      const speedTension = hasInteractedRef.current ? clamp((smoothedVelocity - 0.08) / 1.1) : 0;
+      const targetProgress = hasInteractedRef.current ? 0.9 - speedTension * 0.82 : restingProgress;
+      const easing = hasInteractedRef.current ? 0.046 + speedTension * 0.16 : 0.08;
+      const nextProgress = progressRef.current + (targetProgress - progressRef.current) * easing;
+
+      progressRef.current = clamp(nextProgress);
+      lastScrollYRef.current = scrollY;
+      lastFrameTimeRef.current = time;
+
+      setProgress(progressRef.current);
+      setScrollSpeed(speedTension);
+      rafRef.current = window.requestAnimationFrame(syncMotion);
     };
 
-    const scheduleSync = () => {
-      if (rafRef.current) return;
-      rafRef.current = window.requestAnimationFrame(() => {
-        rafRef.current = 0;
-        syncProgress();
-      });
+    const markInteraction = () => {
+      hasInteractedRef.current = true;
     };
 
-    syncProgress();
-    window.addEventListener("scroll", scheduleSync, { passive: true });
-    window.addEventListener("resize", scheduleSync);
+    rafRef.current = window.requestAnimationFrame(syncMotion);
+    window.addEventListener("wheel", markInteraction, { passive: true });
+    window.addEventListener("touchmove", markInteraction, { passive: true });
+    window.addEventListener("keydown", markInteraction);
 
     return () => {
-      window.removeEventListener("scroll", scheduleSync);
-      window.removeEventListener("resize", scheduleSync);
+      window.removeEventListener("wheel", markInteraction);
+      window.removeEventListener("touchmove", markInteraction);
+      window.removeEventListener("keydown", markInteraction);
       if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
     };
   }, []);
@@ -84,11 +105,12 @@ export default function App() {
         {
           "--progress": progress,
           "--tension": 1 - progress,
+          "--speed": scrollSpeed,
           "--copy-darkness": clamp(progress * 1.9),
         } as CSSProperties
       }
     >
-      <section ref={sceneRef} className="scroll-scene" aria-label="握沙之手滚动场景">
+      <section className="scroll-scene" aria-label="握沙之手滚动场景">
         <div className="sticky-stage">
           <div className="atmosphere" aria-hidden="true">
             <div className="shadow-orb" />
@@ -97,7 +119,7 @@ export default function App() {
           </div>
 
           <div className="scene-copy">
-            <p className="scene-kicker">一握一放</p>
+            <p className="scene-kicker">急则执 · 缓则松</p>
             <h1>{phase.eyebrow}</h1>
             <p>{phase.line}</p>
           </div>
@@ -109,7 +131,7 @@ export default function App() {
 
           <div className="phase-rail" aria-label="阶段">
             <span className={progress < 0.34 ? "active" : ""}>执</span>
-            <span className={progress >= 0.34 && progress < 0.74 ? "active" : ""}>落</span>
+            <span className={progress >= 0.34 && progress < 0.74 ? "active" : ""}>息</span>
             <span className={progress >= 0.74 ? "active" : ""}>空</span>
           </div>
         </div>
